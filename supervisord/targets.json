@@ -1,0 +1,56 @@
+{
+  "check_interval_minutes": 360,
+  "item_count": 10,
+  "author_delay_seconds": 15,
+  "out_dir": "./downloads",
+  "targets": [
+    {
+      "nickname": "王芳心理话",
+      "sec_user_id": "MS4wLjABAAAA47BZNwutOD68AsoU5TqZD1_ayUn0-0rcAuu0aPJz7Go"
+    },
+    {
+      "nickname": "卓正科普Distinct",
+      "sec_user_id": "MS4wLjABAAAA0ovzGe4kxUWzLEnXsOVTCyr2yzTXZnwC4jKiDDURQ6JW_NAhZXfAFSLVOB-t74Iw"
+    },
+    {
+      "nickname": "叶盛医生",
+      "sec_user_id": "MS4wLjABAAAAU_96ay2-mbhE9reYcYMGdw_8tLGXWTP1dIzFTNlGMQo"
+    },
+    {
+      "nickname": "儿童眼科蒋晶晶",
+      "sec_user_id": "MS4wLjABAAAATcvM1xC2GqooMYNZsLZGxIFF7XXxvmDWF3rB-S34HGLhNXnfRiiMwdsEA32r9FhQ"
+    },
+    {
+      "nickname": "刘晓雁医生",
+      "sec_user_id": "MS4wLjABAAAA5VIjTxtPK99d_LHkjffvFHt43Sk0AkoMPb5OW-fjaKNx9_C8rkTyuiZxl3h2DaXU"
+    },
+    {
+      "nickname": "秦大可博士",
+      "sec_user_id": "MS4wLjABAAAA2b-AmCt8v6FZ7l3r4BWQ3lK6y61cTy9GY09iCoPM4_c"
+    },
+    {
+      "nickname": "崔玉涛",
+      "sec_user_id": "MS4wLjABAAAAtdAMFmWvZpzVXAKSXg_k1CMec3bGbu90pCiLj1_9nIA"
+    },
+    {
+      "nickname": "儿科李掰掰",
+      "sec_user_id": "MS4wLjABAAAA1EgforX_E9k1XZkfUbVvLmpGOsJhBWDr6aLfGEl_cyqBDiVvamzBr4a733zSfuaA"
+    },
+    {
+      "nickname": "怡禾健康",
+      "sec_user_id": "MS4wLjABAAAAsMo6-NGgJOACJBasHLy8wzeHfWQcd5OSVJOJWfGLG-4"
+    },
+    {
+      "nickname": "小儿耳鼻喉许信达博士",
+      "sec_user_id": "MS4wLjABAAAAk_-kD2oBFtMbAyhvuVEzD07ux_1R6GHfR86SW_xetkY"
+    },
+    {
+      "nickname": "儿童眼科余继锋",
+      "sec_user_id": "MS4wLjABAAAAc4bat9ZboP81Ur5a7buuwgfRwDEdF--pBdr2AYRLeLE"
+    },
+    {
+      "nickname": "言语训练杜老师",
+      "sec_user_id": "MS4wLjABAAAAkzARphgPs63UaggfVM0rt4v-E3NX56XfQdIIw-j9AsvSvImNjP6VWkIRYk83sWex"
+    }
+  ]
+}

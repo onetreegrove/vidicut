@@ -1,0 +1,19 @@
+# Credentials & Environment
+.env
+.env.local
+*.env
+
+# Media Downloads & Logs
+downloads/
+*.log
+
+# Dependencies & Build Outputs
+node_modules/
+dist/
+web/node_modules/
+web/dist/
+
+# Scratch & OS Files
+scratch/
+tmp/
+.DS_Store
