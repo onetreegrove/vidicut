@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { Users, Film, Layers, CheckCircle2, Terminal, RefreshCw, ShieldAlert, Cpu } from 'lucide-vue-next'
+import { apiFetch } from '../lib/api'
 
 interface Stats {
   total_authors: number
@@ -33,7 +34,7 @@ let eventSource: EventSource | null = null
 
 async function fetchStats() {
   try {
-    const res = await fetch('/api/dashboard/stats')
+    const res = await apiFetch('/api/dashboard/stats')
     const json = await res.json()
     if (json.success) {
       stats.value = json.data
@@ -167,12 +168,12 @@ onUnmounted(() => {
             <h3 class="font-semibold text-slate-200">Supervisord 守护进程 (dy_monitor_daemon.ts)</h3>
             <span class="px-2.5 py-0.5 rounded-full text-xs font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">RUNNING</span>
           </div>
-          <p class="text-xs text-slate-400 mt-1">单进程 PID 锁保活 + 单日防重复 Check 锁 + 15s~20s 串行打散 Jitter Delay</p>
+          <p class="text-xs text-slate-400 mt-1">单进程 PID 锁保活 + 按巡检间隔调度 + 15s~20s 串行打散 Jitter Delay</p>
         </div>
       </div>
 
       <div class="flex items-center gap-3">
-        <span class="text-xs text-slate-400 font-mono">巡检时间间隔: 6 小时/次</span>
+        <span class="text-xs text-slate-400 font-mono">巡检时间间隔: 按博主配置</span>
       </div>
     </div>
 

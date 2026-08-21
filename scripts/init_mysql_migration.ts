@@ -1,4 +1,4 @@
-import { resolve, join, relative } from "node:path";
+import { resolve, join, relative, isAbsolute } from "node:path";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { ensureDatabaseAndTables, execute, query, pool } from "../src/db/mysql";
 
@@ -24,6 +24,10 @@ interface InfoJson {
   type?: string;
   create_time?: number;
   duration?: number;
+  duration_ms?: number;
+  media_path?: string;
+  cover_path?: string;
+  published_at?: string;
   author?: {
     nickname?: string;
     sec_uid?: string;
@@ -119,11 +123,18 @@ async function migrate() {
       let videoPath: string | null = null;
       let coverPath: string | null = null;
 
-      if (info.files && Array.isArray(info.files)) {
+      if (info.media_path) {
+        videoPath = isAbsolute(info.media_path) ? relative(projectRootDir, info.media_path) : info.media_path;
+      }
+      if (info.cover_path) {
+        coverPath = isAbsolute(info.cover_path) ? relative(projectRootDir, info.cover_path) : info.cover_path;
+      }
+
+      if ((!videoPath || !coverPath) && info.files && Array.isArray(info.files)) {
         for (const f of info.files) {
-          if (f.kind === "video" || f.kind === "image") {
+          if (!videoPath && (f.kind === "video" || f.kind === "image")) {
             videoPath = relative(projectRootDir, f.path);
-          } else if (f.kind === "cover") {
+          } else if (!coverPath && f.kind === "cover") {
             coverPath = relative(projectRootDir, f.path);
           }
         }
@@ -131,8 +142,13 @@ async function migrate() {
 
       const mediaType = info.type === "images" ? "images" : "video";
       const mixName = info.mix_name || "单视频";
-      const pubDate = info.create_time ? new Date(info.create_time * 1000) : null;
-      const durationMs = info.duration ? info.duration : 0;
+      const publishedAt =
+        typeof info.create_time === "number"
+          ? new Date(info.create_time * 1000)
+          : info.published_at
+            ? new Date(info.published_at)
+            : null;
+      const durationMs = info.duration_ms ?? info.duration ?? 0;
 
       await execute(
         `INSERT INTO media_items 
@@ -150,7 +166,7 @@ async function migrate() {
           coverPath,
           videoPath,
           durationMs,
-          pubDate,
+          publishedAt,
         ]
       );
       mediaCount++;

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { Plus, Trash2, Play, RefreshCw, Power, ShieldCheck, Check, AlertCircle, Loader2, X } from 'lucide-vue-next'
+import { apiFetch } from '../lib/api'
 
 interface Author {
   id: number
@@ -35,7 +36,7 @@ const deleteLoading = ref(false)
 async function fetchAuthors() {
   loading.value = true
   try {
-    const res = await fetch('/api/authors')
+    const res = await apiFetch('/api/authors')
     const json = await res.json()
     if (json.success) {
       authors.value = json.data
@@ -50,9 +51,8 @@ async function fetchAuthors() {
 async function toggleStatus(author: Author) {
   const nextStatus = author.status === 'active' ? 'disabled' : 'active'
   try {
-    const res = await fetch(`/api/authors/${author.id}`, {
+    const res = await apiFetch(`/api/authors/${author.id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: nextStatus }),
     })
     const json = await res.json()
@@ -66,9 +66,8 @@ async function toggleStatus(author: Author) {
 
 async function triggerTask(author: Author, type: 'full' | 'incremental') {
   try {
-    const res = await fetch('/api/tasks/trigger', {
+    const res = await apiFetch('/api/tasks/trigger', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ author_id: author.id, task_type: type }),
     })
     const json = await res.json()
@@ -94,9 +93,8 @@ async function handleAddAuthor() {
   submitSuccess.value = ''
 
   try {
-    const res = await fetch('/api/authors', {
+    const res = await apiFetch('/api/authors', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url_or_sec_id: inputUrlOrSecId.value.trim() }),
     })
 
@@ -129,7 +127,7 @@ async function confirmDelete() {
   if (!selectedAuthor.value) return
   deleteLoading.value = true
   try {
-    const res = await fetch(`/api/authors/${selectedAuthor.value.id}?delete_files=${deleteFilesOption.value}`, {
+    const res = await apiFetch(`/api/authors/${selectedAuthor.value.id}?delete_files=${deleteFilesOption.value}`, {
       method: 'DELETE',
     })
     const json = await res.json()
@@ -344,7 +342,7 @@ onMounted(() => {
             class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-cyan-500 focus:ring-0"
           />
           <label for="deleteFilesCheck" class="text-xs text-slate-300 cursor-pointer">
-            同时永久物理删除磁盘 <span class="font-mono text-rose-400">./downloads/{{ selectedAuthor.nickname }}</span> 下的所有视频素材
+            同时永久物理删除磁盘 <span class="font-mono text-rose-400">./downloads/{{ selectedAuthor.sec_user_id }}</span> 下的所有视频素材
           </label>
         </div>
 

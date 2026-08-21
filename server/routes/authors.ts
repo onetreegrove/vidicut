@@ -3,8 +3,27 @@ import type { Request, Response } from "express";
 import { query, execute } from "../../src/db/mysql";
 import { resolve, join } from "node:path";
 import { rmSync, existsSync } from "node:fs";
+import { requireAdminKey } from "../middleware/adminKey";
 
 export const authorsRouter = Router();
+
+function sanitizeFolderName(name: string): string {
+  return name.replace(/[\/\\:\*\?"<>\|]/g, "_").trim();
+}
+
+function getAuthorDownloadDirs(author: { sec_user_id?: string; nickname?: string }) {
+  const dirs: string[] = [];
+
+  if (author.sec_user_id) {
+    dirs.push(resolve(join(process.cwd(), "downloads", sanitizeFolderName(author.sec_user_id))));
+  }
+
+  if (author.nickname) {
+    dirs.push(resolve(join(process.cwd(), "downloads", sanitizeFolderName(author.nickname))));
+  }
+
+  return Array.from(new Set(dirs));
+}
 
 // GET /api/authors - 获取博主列表及统计信息
 authorsRouter.get("/", async (req: Request, res: Response) => {
@@ -50,7 +69,7 @@ authorsRouter.get("/:id", async (req: Request, res: Response) => {
 });
 
 // POST /api/authors - 添加新博主并触发解析/全量抓取
-authorsRouter.post("/", async (req: Request, res: Response) => {
+authorsRouter.post("/", requireAdminKey, async (req: Request, res: Response) => {
   try {
     const { url_or_sec_id, check_interval_minutes, item_count } = req.body;
     if (!url_or_sec_id) {
@@ -70,12 +89,12 @@ authorsRouter.post("/", async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: `博主 (${existing[0].nickname || secUserId}) 已存在于监控列表中` });
     }
 
-    // 尝试解析博主昵称（调用 dy_downloader.ts profile --count 1）
+    // 尝试解析博主昵称（只做元数据查询，不落盘下载）
     const downloaderScript = resolve(join(process.cwd(), ".agents/skills/douyin-downloader/scripts/dy_downloader.ts"));
     let nickname = `博主_${secUserId.substring(0, 8)}`;
 
     try {
-      const proc = Bun.spawn(["bun", "run", downloaderScript, "profile", secUserId, "--count", "1", "--json"], {
+      const proc = Bun.spawn(["bun", "run", downloaderScript, "profile-meta", secUserId, "--json"], {
         stdout: "pipe",
         stderr: "pipe",
       });
@@ -84,8 +103,8 @@ authorsRouter.post("/", async (req: Request, res: Response) => {
 
       if (stdoutStr) {
         const parsed = JSON.parse(stdoutStr);
-        if (parsed.items && parsed.items.length > 0 && parsed.items[0].author?.nickname) {
-          nickname = parsed.items[0].author.nickname;
+        if (parsed.author?.nickname) {
+          nickname = parsed.author.nickname;
         }
       }
     } catch (e) {
@@ -124,7 +143,7 @@ authorsRouter.post("/", async (req: Request, res: Response) => {
 });
 
 // PATCH /api/authors/:id - 修改博主状态或配置
-authorsRouter.patch("/:id", async (req: Request, res: Response) => {
+authorsRouter.patch("/:id", requireAdminKey, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { status, check_interval_minutes, item_count, reset_daily_lock } = req.body;
@@ -151,6 +170,7 @@ authorsRouter.patch("/:id", async (req: Request, res: Response) => {
     }
     if (reset_daily_lock) {
       updates.push("last_check_date = NULL");
+      updates.push("last_check_time = NULL");
     }
 
     if (updates.length > 0) {
@@ -165,7 +185,7 @@ authorsRouter.patch("/:id", async (req: Request, res: Response) => {
 });
 
 // DELETE /api/authors/:id - 删除博主及关联任务/文件
-authorsRouter.delete("/:id", async (req: Request, res: Response) => {
+authorsRouter.delete("/:id", requireAdminKey, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { delete_files } = req.query;
@@ -178,13 +198,14 @@ authorsRouter.delete("/:id", async (req: Request, res: Response) => {
     const author = authorRows[0];
 
     // 如果指定了删除本地文件
-    if (delete_files === "true" && author.nickname) {
-      const authorDir = resolve(join(process.cwd(), "downloads", author.nickname));
-      if (existsSync(authorDir)) {
-        try {
-          rmSync(authorDir, { recursive: true, force: true });
-        } catch (e) {
-          // ignore
+    if (delete_files === "true") {
+      for (const dir of getAuthorDownloadDirs(author)) {
+        if (existsSync(dir)) {
+          try {
+            rmSync(dir, { recursive: true, force: true });
+          } catch (e) {
+            // ignore
+          }
         }
       }
     }

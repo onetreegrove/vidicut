@@ -5,7 +5,7 @@ import { authorsRouter } from "./routes/authors";
 import { tasksRouter } from "./routes/tasks";
 import { mediaRouter } from "./routes/media";
 import { logsRouter } from "./routes/logs";
-import { query } from "../src/db/mysql";
+import { query, ensureDatabaseAndTables } from "../src/db/mysql";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -47,6 +47,14 @@ app.get("/api/dashboard/stats", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Web API 后端服务启动成功！监听端口: http://localhost:${PORT}`);
+async function bootstrap() {
+  await ensureDatabaseAndTables();
+  app.listen(PORT, () => {
+    console.log(`🚀 Web API 后端服务启动成功！监听端口: http://localhost:${PORT}`);
+  });
+}
+
+bootstrap().catch((err) => {
+  console.error("❌ Web API 启动失败:", err);
+  process.exit(1);
 });

@@ -1,5 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { relative } from "node:path";
+import { createHash } from "node:crypto";
 import type { DyDownloadOutput, DownloadResultFile, DouyinAwemeItem } from "./types";
 
 const MOBILE_USER_AGENT =
@@ -17,6 +19,30 @@ function sleep(ms: number): Promise<void> {
 
 function getRandomDelay(baseMs: number = 1500, jitterMs: number = 1500): number {
   return baseMs + Math.floor(Math.random() * jitterMs);
+}
+
+function shortHash(input: string): string {
+  return createHash("sha1").update(input).digest("hex").slice(0, 8);
+}
+
+function sanitizeAsciiFolderName(value: string, fallback: string): string {
+  const cleaned = value.replace(/[^A-Za-z0-9_-]/g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "");
+  return cleaned || fallback;
+}
+
+function getAuthorFolderName(item: DouyinAwemeItem): string {
+  return sanitizeAsciiFolderName(item.author.sec_uid || item.author.uid || `author_${shortHash(item.author.nickname)}`, "author_unknown");
+}
+
+function getCategoryFolderName(item: DouyinAwemeItem, contextMixId?: string): string {
+  const mixId = contextMixId || item.mix_id;
+  if (mixId) {
+    return `mix_${sanitizeAsciiFolderName(mixId, shortHash(mixId))}`;
+  }
+  if (item.mix_name) {
+    return `mix_${shortHash(item.mix_name)}`;
+  }
+  return "single";
 }
 
 /**
@@ -263,6 +289,7 @@ function extractAwemeItem(detail: any): DouyinAwemeItem {
 
   const isImages = (Array.isArray(detail.images) && detail.images.length > 0) || detail.aweme_type === 68;
   const media_type = isImages ? "images" : "video";
+  const duration_ms = detail.video?.duration || detail.duration || 0;
 
   let video_url: string | undefined = undefined;
   if (!isImages) {
@@ -284,6 +311,7 @@ function extractAwemeItem(detail: any): DouyinAwemeItem {
 
   // 提取合集/专辑名称 (如果有)
   const mix_name = detail.mix_info?.mix_name || detail.mix_name || undefined;
+  const mix_id = detail.mix_info?.mix_id || detail.mix_id || undefined;
 
   const stats = {
     digg_count: detail.statistics?.digg_count || 0,
@@ -297,34 +325,30 @@ function extractAwemeItem(detail: any): DouyinAwemeItem {
     create_time,
     author,
     media_type,
+    duration_ms,
     video_url,
     images,
     cover_url,
     music_url,
     music_title,
     mix_name,
+    mix_id,
     stats,
   };
 }
 
 /**
- * 执行作品文件下载 (新分类架构: {博主名}/{合集名|单视频}/{作品ID_作品标题})
+ * 执行作品文件下载 (新分类架构: {sec_user_id}/{mix_<mix_id>|single}/aweme_<aweme_id>)
  */
 async function processAwemeItem(
   item: DouyinAwemeItem,
   outDir: string,
   customCookie?: string,
-  contextMixName?: string
+  contextMixId?: string
 ): Promise<DyDownloadOutput> {
-  const sanitizedAuthor = item.author.nickname.replace(/[\/\\:\*\?"<>\|]/g, "_").trim() || "未知作者";
-  const sanitizedTitle = item.desc.replace(/[\/\\:\*\?"<>\|]/g, "_").trim().slice(0, 50) || "无标题";
-  const itemDirName = `${item.aweme_id}_${sanitizedTitle}`;
-
-  // 优先判定合集目录；无合集则统一归类入 “单视频” 目录
-  const activeMixName = item.mix_name || contextMixName;
-  const categoryFolder = activeMixName ? activeMixName.replace(/[\/\\:\*\?"<>\|]/g, "_").trim() : "单视频";
-
-  const itemDir = resolve(join(outDir, sanitizedAuthor, categoryFolder, itemDirName));
+  const authorFolder = getAuthorFolderName(item);
+  const categoryFolder = getCategoryFolderName(item, contextMixId);
+  const itemDir = resolve(join(outDir, authorFolder, categoryFolder, `aweme_${item.aweme_id}`));
   const infoPath = resolve(join(itemDir, "info.json"));
 
   // 断点跳过逻辑：如果已被下载，秒级返回
@@ -340,12 +364,15 @@ async function processAwemeItem(
   await mkdir(itemDir, { recursive: true });
 
   const resultFiles: DownloadResultFile[] = [];
+  let primaryMediaPath: string | undefined;
+  let coverSavedPath: string | undefined;
 
   if (item.media_type === "video" && item.video_url) {
-    const filename = `${sanitizedTitle}.mp4`;
+    const filename = `aweme_${item.aweme_id}.mp4`;
     const destPath = resolve(join(itemDir, filename));
     const ok = await downloadFile(item.video_url, destPath, customCookie);
     if (ok) {
+      primaryMediaPath = destPath;
       resultFiles.push({
         kind: "video",
         path: destPath,
@@ -359,6 +386,9 @@ async function processAwemeItem(
       const destPath = resolve(join(itemDir, filename));
       const ok = await downloadFile(imgUrl, destPath, customCookie);
       if (ok) {
+        if (!primaryMediaPath) {
+          primaryMediaPath = destPath;
+        }
         resultFiles.push({
           kind: "image",
           path: destPath,
@@ -372,6 +402,7 @@ async function processAwemeItem(
     const coverPath = resolve(join(itemDir, "cover.jpg"));
     const ok = await downloadFile(item.cover_url, coverPath, customCookie);
     if (ok) {
+      coverSavedPath = coverPath;
       resultFiles.push({
         kind: "cover",
         path: coverPath,
@@ -396,10 +427,15 @@ async function processAwemeItem(
     status: "success",
     type: item.media_type,
     aweme_id: item.aweme_id,
-    mix_name: activeMixName,
+    mix_id: item.mix_id || contextMixId,
+    mix_name: item.mix_name,
     title: item.desc,
     author: item.author,
     files: resultFiles,
+    create_time: item.create_time,
+    duration_ms: item.duration_ms,
+    media_path: primaryMediaPath ? relative(process.cwd(), primaryMediaPath) : undefined,
+    cover_path: coverSavedPath ? relative(process.cwd(), coverSavedPath) : undefined,
     cover: item.cover_url,
     music: item.music_url ? { title: item.music_title, url: item.music_url } : undefined,
   };
@@ -556,7 +592,7 @@ async function main() {
   const args = Bun.argv.slice(2);
 
   if (args.length === 0 || args.includes("--help") || args.includes("-h")) {
-    console.log(`
+  console.log(`
 Douyin Downloader CLI (Bun + TS)
 
 使用示例:
@@ -566,8 +602,11 @@ Douyin Downloader CLI (Bun + TS)
   # 2. 解析下载合集
   bun run dy_downloader.ts mix "7535361333240268827" --count 10 --out ./downloads --json
 
-  # 3. 抓取博主主页作品 (支持按分类自动归档: {博主}/{合集名|单视频}/{作品})
+  # 3. 抓取博主主页作品 (支持按分类自动归档: {sec_user_id}/{mix_<mix_id>|single}/aweme_<aweme_id>)
   bun run dy_downloader.ts profile "https://www.douyin.com/user/MS4wLjABAAAA47BZN..." --count 0 --delay 2000 --out ./downloads --json
+
+  # 4. 仅查询博主元数据，不下载任何作品
+  bun run dy_downloader.ts profile-meta "https://www.douyin.com/user/MS4wLjABAAAA47BZN..." --json
 `);
     process.exit(0);
   }
@@ -605,7 +644,29 @@ Douyin Downloader CLI (Bun + TS)
   }
 
   try {
-    if (command === "parse") {
+    if (command === "profile-meta") {
+      let secUserId = inputTarget;
+      if (inputTarget.includes("http")) {
+        const resolvedUrl = await resolveRedirectUrl(inputTarget, customCookie);
+        const parsed = parseUrlIds(resolvedUrl);
+        secUserId = parsed.sec_user_id || inputTarget;
+      }
+
+      const { author } = await fetchProfileAwemes(secUserId, 1, customCookie, true);
+      const finalResult: DyDownloadOutput = {
+        status: "success",
+        type: "profile-meta",
+        sec_user_id: secUserId,
+        author,
+        files: [],
+      };
+
+      if (isJsonOutput) {
+        console.log(JSON.stringify(finalResult, null, 2));
+      } else {
+        console.log(`✅ 成功解析博主元数据 [${author?.nickname || secUserId}]`);
+      }
+    } else if (command === "parse") {
       const rawUrl = extractUrl(inputTarget) || inputTarget;
       const resolvedUrl = await resolveRedirectUrl(rawUrl, customCookie);
       const { aweme_id, mix_id, sec_user_id } = parseUrlIds(resolvedUrl);
@@ -651,7 +712,7 @@ Douyin Downloader CLI (Bun + TS)
 
         for (let i = 0; i < items.length; i++) {
           const item = items[i];
-          const res = await processAwemeItem(item, outDir, customCookie, mixName);
+          const res = await processAwemeItem(item, outDir, customCookie, mix_id);
           outputs.push(res);
 
           if (i < items.length - 1) {
@@ -696,7 +757,7 @@ Douyin Downloader CLI (Bun + TS)
 
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
-        const res = await processAwemeItem(item, outDir, customCookie, mixName);
+        const res = await processAwemeItem(item, outDir, customCookie, mixId);
         outputs.push(res);
 
         if (i < items.length - 1) {

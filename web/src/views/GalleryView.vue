@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import { Search, Film, Play, Layers, User, X, ChevronLeft, ChevronRight, Loader2 } from 'lucide-vue-next'
+import { apiFetch } from '../lib/api'
 
 interface MediaItem {
   id: number
@@ -49,11 +50,11 @@ const previewItem = ref<MediaItem | null>(null)
 
 async function fetchFilterOptions() {
   try {
-    const resA = await fetch('/api/authors')
+    const resA = await apiFetch('/api/authors')
     const jsonA = await resA.json()
     if (jsonA.success) authors.value = jsonA.data
 
-    const resM = await fetch('/api/media/mixes')
+    const resM = await apiFetch('/api/media/mixes')
     const jsonM = await resM.json()
     if (jsonM.success) mixes.value = jsonM.data
   } catch (e) {
@@ -73,7 +74,7 @@ async function fetchMedia() {
     if (selectedMediaType.value) params.set('media_type', selectedMediaType.value)
     if (searchKeyword.value.trim()) params.set('keyword', searchKeyword.value.trim())
 
-    const res = await fetch(`/api/media?${params.toString()}`)
+    const res = await apiFetch(`/api/media?${params.toString()}`)
     const json = await res.json()
     if (json.success) {
       items.value = json.data.items
@@ -286,13 +287,19 @@ onMounted(() => {
 
         <div class="p-6 flex items-center justify-center bg-black">
           <video 
-            v-if="previewItem.media_path" 
+            v-if="previewItem.media_type === 'video' && previewItem.media_path" 
             :src="`/${previewItem.media_path}`" 
             controls 
             autoplay 
             class="max-h-[60vh] w-full rounded-2xl shadow-2xl"
           ></video>
-          <div v-else class="py-12 text-slate-500">无法在线读取媒体视频文件</div>
+          <img
+            v-else-if="previewItem.media_type === 'images' && previewItem.media_path"
+            :src="`/${previewItem.media_path}`"
+            class="max-h-[60vh] w-auto max-w-full rounded-2xl shadow-2xl object-contain"
+            alt="preview"
+          />
+          <div v-else class="py-12 text-slate-500">无法在线读取媒体文件</div>
         </div>
       </div>
     </div>

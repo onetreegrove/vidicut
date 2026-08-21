@@ -47,7 +47,7 @@ bun run .agents/skills/douyin-downloader/scripts/dy_downloader.ts profile "<博�
 - `--all` 或 `--count 0`: (可选) 开启全量下载模式，迭代自动爬取全部主页作品直到最后一页。
 - `--count <number>`: (可选) 指定下载最新的 N 个作品，默认 `20`。
 - `--delay <ms>`: (可选) 防风控串行休眠基础延迟时间（毫秒，默认 `1500`ms，并叠加随机抖动）。
-- `--out <dir>`: (可选) 根保存路径，默认导出至 `./downloads/profile_<nickname>/`。
+- `--out <dir>`: (可选) 根保存路径，默认导出至 `./downloads/<sec_user_id>/`。
 - `--json`: (可选) 输出结构化 JSON 数据。
 
 **参数与选项：**
@@ -61,12 +61,12 @@ bun run .agents/skills/douyin-downloader/scripts/dy_downloader.ts profile "<博�
 
 ## 输出规格 (Output Contract)
 
-成功执行后，所有作品将统一按 **`./downloads/{博主名}/{合集名|单视频}/{作品ID_作品标题}/`** 的极简二级分类方式自动归档落盘：
+成功执行后，所有作品将统一按 **`./downloads/{sec_user_id}/{mix_<mix_id>|single}/aweme_<aweme_id>/`** 的极简二级分类方式自动归档落盘：
 
 1. **带有合集的作品**（无论来自主页抓取还是链接抓取）：
-   保存于 `./downloads/{博主名}/{合集名}/{作品ID_作品标题}/`
+   保存于 `./downloads/{sec_user_id}/mix_<mix_id>/aweme_<aweme_id>/`
 2. **不属于任何合集的作品**（散条视频/主页散条作品）：
-   统一保存于 `./downloads/{博主名}/单视频/{作品ID_作品标题}/`
+   统一保存于 `./downloads/{sec_user_id}/single/aweme_<aweme_id>/`
 
 终端返回的标准 JSON 格式如下：
 
@@ -84,17 +84,17 @@ bun run .agents/skills/douyin-downloader/scripts/dy_downloader.ts profile "<博�
   "files": [
     {
       "kind": "video", // "video" | "image" | "cover" | "audio"
-      "path": "/absolute/path/to/downloads/博主/分类/作品ID_标题/标题.mp4",
+      "path": "/absolute/path/to/downloads/<sec_user_id>/<category>/aweme_<aweme_id>/aweme_<aweme_id>.mp4",
       "url": "https://..."
     },
     {
       "kind": "cover",
-      "path": "/absolute/path/to/downloads/博主/分类/作品ID_标题/cover.jpg",
+      "path": "/absolute/path/to/downloads/<sec_user_id>/<category>/aweme_<aweme_id>/cover.jpg",
       "url": "https://..."
     },
     {
       "kind": "audio",
-      "path": "/absolute/path/to/downloads/博主/分类/作品ID_标题/music.mp3",
+      "path": "/absolute/path/to/downloads/<sec_user_id>/<category>/aweme_<aweme_id>/music.mp3",
       "url": "https://..."
     }
   ]

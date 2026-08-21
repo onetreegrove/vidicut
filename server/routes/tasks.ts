@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import { query, execute } from "../../src/db/mysql";
+import { requireAdminKey } from "../middleware/adminKey";
 import { resolve, join, relative } from "node:path";
 import { readFileSync, existsSync } from "node:fs";
 
@@ -25,7 +26,7 @@ tasksRouter.get("/", async (req: Request, res: Response) => {
 });
 
 // POST /api/tasks/trigger - 手动触发全量或增量抓取任务
-tasksRouter.post("/trigger", async (req: Request, res: Response) => {
+tasksRouter.post("/trigger", requireAdminKey, async (req: Request, res: Response) => {
   try {
     const { author_id, task_type } = req.body;
     if (!author_id) {
@@ -41,7 +42,7 @@ tasksRouter.post("/trigger", async (req: Request, res: Response) => {
     const author = authorRows[0];
 
     // 清除单日防重复锁以允许立即抓取
-    await execute(`UPDATE authors SET last_check_date = NULL WHERE id = ?`, [author_id]);
+    await execute(`UPDATE authors SET last_check_date = NULL, last_check_time = NULL WHERE id = ?`, [author_id]);
 
     const result = await execute(
       `INSERT INTO download_tasks (author_id, sec_user_id, task_type, status) VALUES (?, ?, ?, 'pending')`,

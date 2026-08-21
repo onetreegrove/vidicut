@@ -19,6 +19,8 @@ export interface DouyinAwemeItem {
   create_time: number;
   author: AuthorInfo;
   media_type: 'video' | 'images';
+  duration_ms?: number;
+  mix_id?: string;
   video_url?: string;
   images?: string[];
   cover_url?: string;
@@ -35,7 +37,7 @@ export interface DouyinAwemeItem {
 export interface DyDownloadOutput {
   status: 'success' | 'error';
   message?: string;
-  type?: 'video' | 'images' | 'mix' | 'profile';
+  type?: 'video' | 'images' | 'mix' | 'profile' | 'profile-meta';
   aweme_id?: string;
   mix_id?: string;
   mix_name?: string;
@@ -43,6 +45,10 @@ export interface DyDownloadOutput {
   title?: string;
   author?: AuthorInfo;
   files: DownloadResultFile[];
+  create_time?: number;
+  duration_ms?: number;
+  media_path?: string;
+  cover_path?: string;
   cover?: string;
   music?: {
     title?: string;

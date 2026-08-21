@@ -9,6 +9,7 @@ interface AuthorRecord {
   check_interval_minutes: number;
   item_count: number;
   last_check_date: string | null;
+  last_check_time: string | Date | null;
   status: "active" | "disabled";
 }
 
@@ -48,6 +49,24 @@ function getTodayString(): string {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((res) => setTimeout(res, ms));
+}
+
+function getCheckIntervalMs(author: AuthorRecord): number {
+  const minutes = Number(author.check_interval_minutes || 360);
+  return Math.max(1, minutes) * 60 * 1000;
+}
+
+function isAuthorCheckDue(author: AuthorRecord): boolean {
+  if (!author.last_check_time) {
+    return true;
+  }
+
+  const lastCheckTs = new Date(author.last_check_time).getTime();
+  if (Number.isNaN(lastCheckTs)) {
+    return true;
+  }
+
+  return Date.now() - lastCheckTs >= getCheckIntervalMs(author);
 }
 
 function acquirePidLock() {
@@ -198,9 +217,12 @@ async function main() {
 
       const author = activeAuthors[i];
 
-      // 单日防重复锁校验
-      if (author.last_check_date === todayStr) {
-        await logToDb(`🔒 博主 [${author.nickname}] 今日 (${todayStr}) 已完成有效巡检 -> 跳过`, "INFO", author.id, cycleIndex);
+      // 按配置的巡检间隔校验
+      if (!isAuthorCheckDue(author)) {
+        const intervalMs = getCheckIntervalMs(author);
+        const lastCheckTs = author.last_check_time ? new Date(author.last_check_time).getTime() : Date.now();
+        const nextCheckAt = new Date(lastCheckTs + intervalMs).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" });
+        await logToDb(`🔒 博主 [${author.nickname}] 尚未到巡检间隔 -> 下次可执行时间 ${nextCheckAt}`, "INFO", author.id, cycleIndex);
       } else {
         await logToDb(`▶️ 正在巡检博主 [${author.nickname}] (${author.sec_user_id})...`, "INFO", author.id, cycleIndex);
         const ok = await runProfileCheck(author.sec_user_id, author.nickname, author.item_count || 10, false);
@@ -226,7 +248,7 @@ async function main() {
     await logToDb(`💤 进入休眠 6 小时，准备下一轮巡检...`, "INFO", null, cycleIndex);
 
     cycleIndex++;
-    await sleep(6 * 360 * 60 * 1000);
+    await sleep(6 * 60 * 60 * 1000);
   }
 }
 
